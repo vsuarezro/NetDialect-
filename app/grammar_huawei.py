@@ -1,3 +1,5 @@
+import argparse
+
 import pyparsing as pp
 
 # DEFINITIONS
@@ -5,7 +7,9 @@ interface_name = pp.Word(pp.alphas + "_" + "-") + pp.Word(pp.nums + "/")
 vlanif = pp.Word("Vlanif")
 interface_type = pp.Word(pp.alphas + "-" + "_")
 interface_id = pp.Word(pp.nums + "/")
-description = pp.Suppress("description") + pp.restOfLine
+description = pp.Combine(
+    pp.Suppress("description") + pp.Suppress(pp.Literal(" ")) + pp.restOfLine
+)
 
 vrf = pp.Word(pp.alphas + "_" + "&")
 ip_address = pp.Combine(
@@ -29,7 +33,7 @@ mask = pp.Combine(
 
 portswitch = pp.Word("portswitch")
 link_type = pp.Suppress("port link-type") + pp.Word(pp.alphas)
-link_type_trunk = pp.Suppress("port link-type trunk")
+link_type_trunk = pp.Literal("port link-type trunk")
 link_type_access = pp.Suppress("port link-type access")
 
 vlans_allowed = pp.OneOrMore(
@@ -56,7 +60,9 @@ vlan_interface_block = (
     + interface_id("interface_id")
     + pp.Optional(description("description"))
     + pp.Optional(pp.Suppress("ip binding vpn-instance") + vrf("vrf"))
-    + pp.Suppress("ip address") + ip_address("ip_address") + mask("mask")
+    + pp.Suppress("ip address")
+    + ip_address("ip_address")
+    + mask("mask")
 )
 
 trunk_interface_block = (
@@ -98,8 +104,11 @@ l3_interface_block = (
     + interface_id("interface_id")
     + pp.Optional(description("description"))
     + pp.Optional(pp.Optional(pp.Word("undo")) + pp.Word("shutdown"))
-    + pp.Suppress("ip binding vpn-instance") + vrf("vrf")
-    + pp.Suppress("ip address") + ip_address("ip_address") + mask("mask")
+    + pp.Suppress("ip binding vpn-instance")
+    + vrf("vrf")
+    + pp.Suppress("ip address")
+    + ip_address("ip_address")
+    + mask("mask")
 )
 
 
@@ -130,13 +139,15 @@ config_grammar = pp.OneOrMore(
     | pp.Group(trunk_member_interface_block)
     | pp.Group(l3_interface_block)
     | pp.Group(vlan_block)
-    | pp.Group(static_route_block) 
+    | pp.Group(static_route_block)
     | pp.Suppress(pp.AtLineStart("#") + pp.rest_of_line)
     | pp.Suppress(ignore_line)
 )
 
-if __name__ == "__main__":
-    huawei_config = """
+
+def run_example():
+
+    EXAMPLE_huawei_config = """
 #
 sysname HOSTNAME_STRING
 #
@@ -204,7 +215,7 @@ interface GigabitEthernet1/1/9
  traffic-policy qos_cs2 inbound
 #
 interface GigabitEthernet1/1/10
- description To-MXAGUAGU0025MW01
+ description To-L2domain
  undo shutdown
  eth-trunk 1
 #
@@ -244,10 +255,12 @@ ip route-static vpn-instance VRF&eNodeB 10.62.98.227 255.255.255.255 10.62.66.22
 ip route-static vpn-instance VRF_eNodeB 10.62.98.228 255.255.255.255 10.62.66.228 description to IPsec / VLAN-3102
 """
 
+    results = config_grammar.parse_string(EXAMPLE_huawei_config)
+    print(EXAMPLE_huawei_config)
+    input("Press a key to continue...")
+    # print(intermediate_representation_yaml)
 
-    #    config_grammar.set_debug()
-    results = config_grammar.parse_string(huawei_config)
-    results.pprint()
+
     for data in results:
         if data.get("vlanif"):
             interface_id = data.get("interface_id")
@@ -290,6 +303,7 @@ ip route-static vpn-instance VRF_eNodeB 10.62.98.228 255.255.255.255 10.62.66.22
             print(f"\nAGGREGATE VLAN: {vlan_name}")
             print("Description:", data.get("description"))
             print("Aggregate vlan:", data.get("aggregate_vlan"))
+            print("VRF:", data.get("vrf"))
             print("Start access VLAN: ", data.get("vlan_start"))
             print("End access VLAN: ", data.get("vlan_end"))
 
@@ -303,3 +317,23 @@ ip route-static vpn-instance VRF_eNodeB 10.62.98.228 255.255.255.255 10.62.66.22
             )
             print("Next Hop:", data.get("next_hop"))
             print("Description:", data.get("description"))
+
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Test Huawei grammar.')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--file', help='The file to parse.')
+    group.add_argument('--test', help='The parser block and string to test.')
+    group.add_argument('--example', help='Run the example with using embedded config', action='store_true')
+
+    args = parser.parse_args()
+
+    if args.file:
+        pass
+    elif args.test:
+        pass
+    elif args.example:
+        run_example()
+
