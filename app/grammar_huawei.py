@@ -1,6 +1,7 @@
 import argparse
 
 import pyparsing as pp
+from ir import IR
 
 # DEFINITIONS
 interface_name = pp.Word(pp.alphas + "_" + "-") + pp.Word(pp.nums + "/")
@@ -49,7 +50,7 @@ vlan_id = pp.Word(pp.nums)
 lag_id = pp.Word(pp.nums)
 aggregate_vlan_str = pp.Word("aggregate-vlan")
 
-static_route_starter = pp.Word("ip route-static vpn-instance")
+static_route_starter = pp.Literal("ip route-static vpn-instance")
 
 ignore_line = pp.Regex(r".*\r?\n")
 
@@ -258,6 +259,8 @@ ip route-static vpn-instance VRF_eNodeB 10.62.98.228 255.255.255.255 10.62.66.22
     results = config_grammar.parse_string(EXAMPLE_huawei_config)
     print(EXAMPLE_huawei_config)
     input("Press a key to continue...")
+    print(results)
+    input("Press a key to continue...")
     # print(intermediate_representation_yaml)
 
 
@@ -317,8 +320,11 @@ ip route-static vpn-instance VRF_eNodeB 10.62.98.228 255.255.255.255 10.62.66.22
             )
             print("Next Hop:", data.get("next_hop"))
             print("Description:", data.get("description"))
+    return results    
 
-
+def run_parsing(data:str) -> pp.ParseResults:
+    results = config_grammar.parse_string(data)
+    return results
 
 if __name__ == "__main__":
 
@@ -331,9 +337,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.file:
-        pass
+        with open(args.file, 'r') as open_file:
+            config = open_file.read()
+        results = run_parsing(config)
+        ir = IR(results)
+        print(ir)
     elif args.test:
         pass
     elif args.example:
-        run_example()
+        results = run_example()
 
